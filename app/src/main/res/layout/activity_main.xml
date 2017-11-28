@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="com.why94.test.RecyclerAdapterTestMainActivity">
+
+    <Switch
+        android:id="@+id/transaction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="4dp"
+        android:text="@string/transaction"/>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="4dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/add"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/background"
+                android:gravity="center"
+                android:onClick="add"
+                android:text="@string/add"/>
+
+            <TextView
+                android:id="@+id/change"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/background"
+                android:gravity="center"
+                android:onClick="change"
+                android:text="@string/change"/>
+
+            <TextView
+                android:id="@+id/move"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/background"
+                android:gravity="center"
+                android:onClick="move"
+                android:text="@string/move"/>
+
+            <TextView
+                android:id="@+id/remove"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/background"
+                android:gravity="center"
+                android:onClick="remove"
+                android:text="@string/remove"/>
+
+            <TextView
+                android:id="@+id/clear"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_gravity="center"
+                android:layout_margin="4dp"
+                android:background="@drawable/background"
+                android:gravity="center"
+                android:onClick="clear"
+                android:text="@string/clear"/>
+        </LinearLayout>
+
+    </HorizontalScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/recycler_data"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            tools:listitem="@layout/item"/>
+
+        <LinearLayout
+            android:layout_width="180dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <android.support.v7.widget.RecyclerView
+                android:id="@+id/recycler_step"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                tools:listitem="@layout/steps"/>
+
+            <TextView
+                android:id="@+id/clear_step"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/background"
+                android:gravity="center"
+                android:text="@string/clear"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

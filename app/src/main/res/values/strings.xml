@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">RecyclerAdapter</string>
+    <string name="transaction">transaction</string>
+    <string name="add">add</string>
+    <string name="change">change</string>
+    <string name="clear">clear</string>
+    <string name="move">move</string>
+    <string name="remove">remove</string>
+    <string name="title">title</string>
+    <string name="content">content</string>
+    <string name="index">index</string>
+</resources>
