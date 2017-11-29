@@ -21,6 +21,7 @@ import java.util.Objects;
  * RecyclerAdapter
  * Created by WenHuayu<why94@qq.com> on 2017/11/27.
  */
+@SuppressWarnings({"SameParameterValue", "UnusedReturnValue", "WeakerAccess"})
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder> {
 
     private final List<Meta> items = new ArrayList<>();
@@ -69,7 +70,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     @Override
     @SuppressWarnings("unchecked")
     public void onBindViewHolder(Holder holder, int position, List<Object> payloads) {
-        holder.bindData(position, holder.data = items.get(position).data, payloads);
+        holder.bindData(position, holder.data = items.get(position).data, payloads == null ? null : payloads.get(0));
     }
 
     @Override
@@ -92,7 +93,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public <DataType> RecyclerAdapter add(Class<? extends Holder<DataType>> type, DataType data) {
         data().add(new Meta(type(type), data));
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemInserted(items.size() - 1);
         }
         return this;
@@ -103,7 +104,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public <DataType> RecyclerAdapter add(int index, Class<? extends Holder<DataType>> type, DataType data) {
         data().add(index, new Meta(type(type), data));
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemInserted(index);
         }
         return this;
@@ -115,7 +116,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     public <DataType> RecyclerAdapter add(Class<? extends Holder<DataType>> type, List<DataType> data) {
         if (data != null && !data.isEmpty()) {
             data().addAll(Meta.list(type(type), data));
-            if (notifyAble()) {
+            if (notInTransaction()) {
                 notifyItemRangeInserted(items.size() - data.size(), data.size());
             }
         }
@@ -128,7 +129,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     public <DataType> RecyclerAdapter add(int index, @NonNull Class<? extends Holder<DataType>> type, List<DataType> data) {
         if (data != null && !data.isEmpty()) {
             data().addAll(index, Meta.list(type(type), data));
-            if (notifyAble()) {
+            if (notInTransaction()) {
                 notifyItemRangeInserted(index, data.size());
             }
         }
@@ -140,7 +141,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public <DataType> RecyclerAdapter change(int index, Class<? extends Holder<DataType>> type, DataType data) {
         data().set(index, new Meta(type(type), data));
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemChanged(index);
         }
         return this;
@@ -151,7 +152,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public <DataType> RecyclerAdapter change(int index, Class<? extends Holder<DataType>> type, DataType data, Object payload) {
         data().set(index, new Meta(type(type), data));
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemChanged(index, payload);
         }
         return this;
@@ -162,7 +163,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public RecyclerAdapter remove(int index) {
         data().remove(index);
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemRemoved(index);
         }
         return this;
@@ -173,7 +174,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public RecyclerAdapter remove(int from, int to) {
         data().subList(from, to).clear();
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemRangeRemoved(from, to - from);
         }
         return this;
@@ -187,12 +188,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     }
 
     /**
-     * {0}{1}{2} -> [2][0] -> {2}{1}{0}
+     * {0}{1}{2} -> [2][0] -> {2}{0}{1}
      */
     public RecyclerAdapter move(int from, int to) {
         List<Meta> data = data();
         data.add(to, data.remove(from));
-        if (notifyAble()) {
+        if (notInTransaction()) {
             notifyItemMoved(from, to);
         }
         return this;
@@ -204,7 +205,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         return transaction == null ? items : transaction;
     }
 
-    private boolean notifyAble() {
+    private boolean notInTransaction() {
         return transaction == null;
     }
 
@@ -230,9 +231,8 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         }
         final SparseArray<DifferenceComparator<?>> comparatorSparseArray = comparators2SparseArray(comparators);
         DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
-
-            Meta oldItem;
-            Meta newItem;
+            Meta oldItem, newItem;
+            int oldPosition, newPosition;
             DifferenceComparator comparator;
 
             @Override
@@ -247,14 +247,14 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
 
             @Override
             public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-                oldItem = items.get(oldItemPosition);
-                newItem = transaction.get(newItemPosition);
+                oldItem = items.get(oldPosition = oldItemPosition);
+                newItem = transaction.get(newPosition = newItemPosition);
                 if (oldItem.type != newItem.type) {
                     return false;
                 }
                 comparator = comparatorSparseArray.get(newItem.type);
                 if (comparator == null) {
-                    return Objects.equals(oldItem, newItem);
+                    return Objects.equals(oldItem.data, newItem.data);
                 }
                 //noinspection unchecked
                 return comparator.areItemsTheSame(oldItem.data, newItem.data);
@@ -262,26 +262,40 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
 
             @Override
             public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                if (oldItemPosition != oldPosition) {
+                    oldItem = items.get(oldPosition = oldItemPosition);
+                }
+                if (newItemPosition != newPosition) {
+                    newItem = transaction.get(newPosition = newItemPosition);
+                    comparator = comparatorSparseArray.get(newItem.type);
+                }
                 if (comparator == null) {
                     return true;
                 }
                 //noinspection unchecked
-                return comparator.areContentsTheSame(oldItem, newItem);
+                return comparator.areContentsTheSame(oldItem.data, newItem.data);
             }
 
             @Nullable
             @Override
             public Object getChangePayload(int oldItemPosition, int newItemPosition) {
+                if (oldItemPosition != oldPosition) {
+                    oldItem = items.get(oldPosition = oldItemPosition);
+                }
+                if (newItemPosition != newPosition) {
+                    newItem = transaction.get(newPosition = newItemPosition);
+                    comparator = comparatorSparseArray.get(newItem.type);
+                }
                 if (comparator == null) {
                     return null;
                 }
                 //noinspection unchecked
-                return comparator.getChangePayload(oldItem, newItemPosition);
+                return comparator.getChangePayload(oldItem.data, newItem.data);
             }
         }, detectMoves);
         items.clear();
         items.addAll(transaction);
-        diffResult.dispatchUpdatesTo(RecyclerAdapter.this);
+        diffResult.dispatchUpdatesTo(this);
         transaction = null;
         return this;
     }
@@ -362,18 +376,25 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     public abstract static class Holder<DataType> extends RecyclerView.ViewHolder {
         protected DataType data;
 
+        @Deprecated
+        public Holder(ViewGroup group) throws Exception {
+            //noinspection ConstantConditions
+            super(null);
+        }
+
         public Holder(ViewGroup group, View view) {
             super(view);
         }
 
         public Holder(ViewGroup group, @LayoutRes int layout) {
-            super(LayoutInflater.from(group.getContext()).inflate(layout, group, false));
+            this(group, LayoutInflater.from(group.getContext()).inflate(layout, group, false));
         }
 
-        protected abstract void bindData(int position, DataType data);
-
-        protected void bindData(int position, DataType data, Object payload) {
+        protected void bindData(int position, DataType data, @Nullable Object payload) {
             bindData(position, data);
+        }
+
+        protected void bindData(int position, DataType data) {
         }
 
         protected void onViewAttachedToWindow() { }
@@ -390,14 +411,14 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
             this.clas = clas;
         }
 
-        protected boolean areItemsTheSame(T t1, T t2) {
-            return Objects.equals(t1, t2);
+        protected boolean areItemsTheSame(T o1, T o2) {
+            return Objects.equals(o1, o2);
         }
 
-        protected boolean areContentsTheSame(T t1, T t2) {
-            return Objects.equals(t1, t2);
+        protected boolean areContentsTheSame(T o1, T o2) {
+            return Objects.equals(o1, o2);
         }
 
-        protected Object getChangePayload(T t1, T t2) {return null;}
+        protected Object getChangePayload(T o1, T t2) {return null;}
     }
 }
