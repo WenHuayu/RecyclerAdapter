@@ -42,3 +42,5 @@ Step 5. add this holder and data into adapter
 	mAdapter.add(DataHolder.class, 123);
 	
 you can add any type of holders
+
+![image](https://github.com/WenHuayu/RecyclerAdapter/blob/master/img/img1.gif)
