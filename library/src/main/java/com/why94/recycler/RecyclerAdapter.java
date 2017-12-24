@@ -25,19 +25,15 @@ import java.util.Objects;
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder> {
 
     private final List<Meta> items = new ArrayList<>();
-    private final List<Object> outers = new ArrayList<>();
-    private final SparseArray<ConstructorMeta> constructors = new SparseArray<>();
+    private final List<Object> holderInitArgs = new ArrayList<>();
+    private final SparseArray<ConstructorMeta> holderConstructors = new SparseArray<>();
 
-    public RecyclerAdapter(Object... outers) {
-        this.outers.addAll(Arrays.asList(outers));
+    public RecyclerAdapter(Object... holderInitArgs) {
+        this.holderInitArgs.addAll(Arrays.asList(holderInitArgs));
     }
 
-    public void addOuter(Object outer) {
-        outers.add(outer);
-    }
-
-    public boolean isEmpty() {
-        return items.isEmpty();
+    public void addHolderInitArgs(Object... initArgs) {
+        this.holderInitArgs.addAll(Arrays.asList(initArgs));
     }
 
     @Override
@@ -50,27 +46,18 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         return items.get(position).type;
     }
 
-    private int type(Class<? extends Holder> type) {
-        int hash = type.hashCode();
-        if (constructors.indexOfKey(hash) < 0) {
-            constructors.put(hash, new ConstructorMeta(outers, type));
-        }
-        return hash;
-    }
-
     @Override
     public Holder onCreateViewHolder(ViewGroup parent, int type) {
-        return constructors.get(type).newInstance(parent);
+        return holderConstructors.get(type).newInstance(parent);
     }
 
     @Override
-    public void onBindViewHolder(Holder holder, int position) {
-    }
+    public void onBindViewHolder(Holder holder, int position) { }
 
     @Override
     @SuppressWarnings("unchecked")
     public void onBindViewHolder(Holder holder, int position, List<Object> payloads) {
-        holder.bindData(position, holder.data = items.get(position).data, payloads == null ? null : payloads.get(0));
+        holder.bindData(position, holder.data = items.get(position).data, payloads);
     }
 
     @Override
@@ -86,6 +73,27 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     @Override
     public void onViewRecycled(Holder holder) {
         holder.onViewRecycled();
+    }
+
+    @Override
+    public boolean onFailedToRecycleView(Holder holder) {
+        return holder.onFailedToRecycleView();
+    }
+
+    public boolean isEmpty() {
+        return items.isEmpty();
+    }
+
+    public int getDataCount() {
+        return data().size();
+    }
+
+    private int type(Class<? extends Holder> type) {
+        int hash = type.hashCode();
+        if (holderConstructors.indexOfKey(hash) < 0) {
+            holderConstructors.put(hash, new ConstructorMeta(holderInitArgs, type));
+        }
+        return hash;
     }
 
     /**
@@ -201,7 +209,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
 
     private List<Meta> transaction;
 
-    private List<Meta> data() {
+    List<Meta> data() {
         return transaction == null ? items : transaction;
     }
 
@@ -290,7 +298,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
                     return null;
                 }
                 //noinspection unchecked
-                return comparator.getChangePayload(oldItem.data, newItem.data);
+                return comparator.getChangePayloadInner(oldItem.data, newItem.data);
             }
         }, detectMoves);
         items.clear();
@@ -303,12 +311,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     private SparseArray<DifferenceComparator<?>> comparators2SparseArray(DifferenceComparator<?>... comparators) {
         SparseArray<DifferenceComparator<?>> comparatorSparseArray = new SparseArray<>(comparators.length);
         for (DifferenceComparator<?> comparator : comparators) {
-            comparatorSparseArray.put(type(comparator.clas), comparator);
+            comparatorSparseArray.put(type(comparator.holder), comparator);
         }
         return comparatorSparseArray;
     }
 
-    private static class Meta {
+    static class Meta {
         final int type;
         Object data;
 
@@ -326,11 +334,11 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         }
     }
 
-    private static class ConstructorMeta {
+    static class ConstructorMeta {
         final Constructor<? extends Holder> constructor;
         final Object[] args;
 
-        private ConstructorMeta(List<Object> outers, Class<? extends Holder> type) {
+        ConstructorMeta(List<Object> outers, Class<? extends Holder> type) {
             for (Constructor<?> constructor : type.getConstructors()) {
                 Class<?>[] parameters = constructor.getParameterTypes();
                 if (parameters.length == 0) {
@@ -363,7 +371,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
             throw new RuntimeException(String.format(Locale.getDefault(), "unable to find a appropriate constructor from outers:%s", type));
         }
 
-        private Holder newInstance(ViewGroup parent) {
+        Holder newInstance(ViewGroup parent) {
             try {
                 args[args.length - 1] = parent;
                 return constructor.newInstance(args);
@@ -376,8 +384,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     public abstract static class Holder<DataType> extends RecyclerView.ViewHolder {
         protected DataType data;
 
+        /**
+         * Your holder's constructor signature should look like this
+         * but the super constructor should call others, such as{@link #Holder(ViewGroup, int)} or {@link #Holder(ViewGroup, View)}
+         */
         @Deprecated
-        public Holder(ViewGroup group) throws Exception {
+        public Holder(ViewGroup group) {
             //noinspection ConstantConditions
             super(null);
         }
@@ -388,6 +400,10 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
 
         public Holder(ViewGroup group, @LayoutRes int layout) {
             this(group, LayoutInflater.from(group.getContext()).inflate(layout, group, false));
+        }
+
+        protected void bindData(int position, DataType data, @NonNull List<Object> payloads) {
+            bindData(position, data, payloads.isEmpty() ? null : payloads.get(0));
         }
 
         protected void bindData(int position, DataType data, @Nullable Object payload) {
@@ -402,23 +418,39 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         protected void onViewDetachedFromWindow() { }
 
         protected void onViewRecycled() { }
+
+        protected boolean onFailedToRecycleView() { return false; }
     }
 
-    public abstract static class DifferenceComparator<T> {
-        final Class<? extends Holder<T>> clas;
+    public static abstract class DifferenceComparator<DataType> {
+        final Class<? extends Holder<DataType>> holder;
+        private boolean equalsByPayload;
+        private Object payload;
 
-        public DifferenceComparator(Class<? extends Holder<T>> clas) {
-            this.clas = clas;
+        public DifferenceComparator(Class<? extends Holder<DataType>> holder) {
+            this.holder = holder;
         }
 
-        protected boolean areItemsTheSame(T o1, T o2) {
+        protected boolean areItemsTheSame(DataType o1, DataType o2) {
             return Objects.equals(o1, o2);
         }
 
-        protected boolean areContentsTheSame(T o1, T o2) {
-            return Objects.equals(o1, o2);
+        protected boolean areContentsTheSame(DataType o1, DataType o2) {
+            payload = getChangePayload(o1, o2);
+            equalsByPayload = true;
+            return payload == null;
         }
 
-        protected Object getChangePayload(T o1, T t2) {return null;}
+        protected Object getChangePayload(DataType o1, DataType o2) {
+            return null;
+        }
+
+        final Object getChangePayloadInner(DataType o1, DataType o2) {
+            if (equalsByPayload) {
+                return payload;
+            } else {
+                return getChangePayload(o1, o2);
+            }
+        }
     }
 }
