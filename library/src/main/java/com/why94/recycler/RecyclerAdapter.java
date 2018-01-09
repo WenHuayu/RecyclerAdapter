@@ -21,7 +21,7 @@ import java.util.Objects;
  * RecyclerAdapter
  * Created by WenHuayu<why94@qq.com> on 2017/11/27.
  */
-@SuppressWarnings({"SameParameterValue", "UnusedReturnValue", "WeakerAccess"})
+@SuppressWarnings({"SameParameterValue", "UnusedReturnValue", "WeakerAccess", "unused"})
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder> {
 
     private final List<Meta> items = new ArrayList<>();
@@ -73,11 +73,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     @Override
     public void onViewRecycled(Holder holder) {
         holder.onViewRecycled();
-    }
-
-    @Override
-    public boolean onFailedToRecycleView(Holder holder) {
-        return holder.onFailedToRecycleView();
     }
 
     public boolean isEmpty() {
@@ -233,34 +228,45 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         return commitTransaction(true, comparators);
     }
 
-    public RecyclerAdapter commitTransaction(boolean detectMoves, DifferenceComparator... comparators) {
+    public RecyclerAdapter commitTransaction(boolean detectMoves, final DifferenceComparator... comparators) {
         if (transaction == null) {
             return this;
         }
-        final SparseArray<DifferenceComparator<?>> comparatorSparseArray = comparators2SparseArray(comparators);
+
         DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
-            Meta oldItem, newItem;
-            int oldPosition, newPosition;
+
+            final SparseArray<DifferenceComparator<?>> mComparatorSparseArray;
+            final List<Meta> mNewItems = new ArrayList<>(transaction);
+            final List<Meta> mOldItems = new ArrayList<>(items);
+
             DifferenceComparator comparator;
+            Meta oldItem, newItem;
+
+            {
+                mComparatorSparseArray = new SparseArray<>(comparators.length);
+                for (DifferenceComparator<?> comparator : comparators) {
+                    mComparatorSparseArray.put(type(comparator.holder), comparator);
+                }
+            }
 
             @Override
             public int getOldListSize() {
-                return items.size();
+                return mOldItems.size();
             }
 
             @Override
             public int getNewListSize() {
-                return transaction.size();
+                return mNewItems.size();
             }
 
             @Override
             public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-                oldItem = items.get(oldPosition = oldItemPosition);
-                newItem = transaction.get(newPosition = newItemPosition);
+                oldItem = mOldItems.get(oldItemPosition);
+                newItem = mNewItems.get(newItemPosition);
                 if (oldItem.type != newItem.type) {
                     return false;
                 }
-                comparator = comparatorSparseArray.get(newItem.type);
+                comparator = mComparatorSparseArray.get(newItem.type);
                 if (comparator == null) {
                     return Objects.equals(oldItem.data, newItem.data);
                 }
@@ -270,13 +276,9 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
 
             @Override
             public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-                if (oldItemPosition != oldPosition) {
-                    oldItem = items.get(oldPosition = oldItemPosition);
-                }
-                if (newItemPosition != newPosition) {
-                    newItem = transaction.get(newPosition = newItemPosition);
-                    comparator = comparatorSparseArray.get(newItem.type);
-                }
+                oldItem = mOldItems.get(oldItemPosition);
+                newItem = mNewItems.get(newItemPosition);
+                comparator = mComparatorSparseArray.get(newItem.type);
                 if (comparator == null) {
                     return true;
                 }
@@ -287,18 +289,14 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
             @Nullable
             @Override
             public Object getChangePayload(int oldItemPosition, int newItemPosition) {
-                if (oldItemPosition != oldPosition) {
-                    oldItem = items.get(oldPosition = oldItemPosition);
-                }
-                if (newItemPosition != newPosition) {
-                    newItem = transaction.get(newPosition = newItemPosition);
-                    comparator = comparatorSparseArray.get(newItem.type);
-                }
+                oldItem = mOldItems.get(oldItemPosition);
+                newItem = mNewItems.get(newItemPosition);
+                comparator = mComparatorSparseArray.get(newItem.type);
                 if (comparator == null) {
                     return null;
                 }
                 //noinspection unchecked
-                return comparator.getChangePayloadInner(oldItem.data, newItem.data);
+                return comparator.getChangePayload(oldItem.data, newItem.data);
             }
         }, detectMoves);
         items.clear();
@@ -306,14 +304,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         diffResult.dispatchUpdatesTo(this);
         transaction = null;
         return this;
-    }
-
-    private SparseArray<DifferenceComparator<?>> comparators2SparseArray(DifferenceComparator<?>... comparators) {
-        SparseArray<DifferenceComparator<?>> comparatorSparseArray = new SparseArray<>(comparators.length);
-        for (DifferenceComparator<?> comparator : comparators) {
-            comparatorSparseArray.put(type(comparator.holder), comparator);
-        }
-        return comparatorSparseArray;
     }
 
     static class Meta {
@@ -399,7 +389,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         }
 
         public Holder(ViewGroup group, @LayoutRes int layout) {
-            this(group, LayoutInflater.from(group.getContext()).inflate(layout, group, false));
+            super(LayoutInflater.from(group.getContext()).inflate(layout, group, false));
         }
 
         protected void bindData(int position, DataType data, @NonNull List<Object> payloads) {
@@ -418,39 +408,21 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         protected void onViewDetachedFromWindow() { }
 
         protected void onViewRecycled() { }
-
-        protected boolean onFailedToRecycleView() { return false; }
     }
 
     public static abstract class DifferenceComparator<DataType> {
         final Class<? extends Holder<DataType>> holder;
-        private boolean equalsByPayload;
-        private Object payload;
 
         public DifferenceComparator(Class<? extends Holder<DataType>> holder) {
             this.holder = holder;
         }
 
-        protected boolean areItemsTheSame(DataType o1, DataType o2) {
-            return Objects.equals(o1, o2);
-        }
+        protected abstract boolean areItemsTheSame(DataType o1, DataType o2);
+
+        protected abstract Object getChangePayload(DataType o1, DataType o2);
 
         protected boolean areContentsTheSame(DataType o1, DataType o2) {
-            payload = getChangePayload(o1, o2);
-            equalsByPayload = true;
-            return payload == null;
-        }
-
-        protected Object getChangePayload(DataType o1, DataType o2) {
-            return null;
-        }
-
-        final Object getChangePayloadInner(DataType o1, DataType o2) {
-            if (equalsByPayload) {
-                return payload;
-            } else {
-                return getChangePayload(o1, o2);
-            }
+            return getChangePayload(o1, o2) == null;
         }
     }
 }
