@@ -222,37 +222,84 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     }
 
     public RecyclerAdapter commitTransaction(DifferenceComparator... comparators) {
-        return commitTransaction(true, true, comparators);
+        return commitTransaction(true, comparators);
     }
 
-    public RecyclerAdapter commitTransaction(boolean detectMoves, final DifferenceComparator... comparators) {
-        return commitTransaction(true, detectMoves, comparators);
-    }
-
-    public RecyclerAdapter commitTransaction(boolean async, boolean detectMoves, DifferenceComparator... comparators) {
+    public RecyclerAdapter commitTransaction(boolean detectMoves, DifferenceComparator... comparators) {
         if (mTransactionItems == null) {
             return this;
         }
-        TransactionDiffUtilCallback callback = new TransactionDiffUtilCallback(this, comparators);
-        mTransactionItems = null;
-        if (async) {
-            mTransactionAsyncTask = new TransactionAsyncTask(this, callback, detectMoves).execute();
-        } else {
-            dispatchUpdatesTransaction(DiffUtil.calculateDiff(callback, detectMoves), callback.getNewItems());
+        final SparseArray<DifferenceComparator<?>> comparatorsSparseArray = new SparseArray<>(comparators.length);
+        for (DifferenceComparator<?> comparator : comparators) {
+            comparatorsSparseArray.put(type(comparator.holder), comparator);
         }
-        return this;
-    }
+        final List<Meta> newItems = mTransactionItems;
+        final List<Meta> oldItems = new ArrayList<>(mItems);
+        DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
 
-    private void dispatchUpdatesTransaction(DiffUtil.DiffResult diffResult, List<Meta> newItems) {
+            private DifferenceComparator mComparator;
+            private Meta mOldItem, mNewItem;
+
+            @Override
+            public int getOldListSize() {
+                return oldItems.size();
+            }
+
+            @Override
+            public int getNewListSize() {
+                return newItems.size();
+            }
+
+            @Override
+            public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+                mOldItem = oldItems.get(oldItemPosition);
+                mNewItem = newItems.get(newItemPosition);
+                if (mOldItem.type != mNewItem.type) {
+                    return false;
+                }
+                mComparator = comparatorsSparseArray.get(mNewItem.type);
+                if (mComparator == null) {
+                    return Objects.equals(mOldItem.data, mNewItem.data);
+                }
+                //noinspection unchecked
+                return mComparator.areItemsTheSame(mOldItem.data, mNewItem.data);
+            }
+
+            @Override
+            public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                mOldItem = oldItems.get(oldItemPosition);
+                mNewItem = newItems.get(newItemPosition);
+                mComparator = comparatorsSparseArray.get(mNewItem.type);
+                if (mComparator == null) {
+                    return true;
+                }
+                //noinspection unchecked
+                return mComparator.areContentsTheSame(mOldItem.data, mNewItem.data);
+            }
+
+            @Nullable
+            @Override
+            public Object getChangePayload(int oldItemPosition, int newItemPosition) {
+                mOldItem = oldItems.get(oldItemPosition);
+                mNewItem = newItems.get(newItemPosition);
+                mComparator = comparatorsSparseArray.get(mNewItem.type);
+                if (mComparator == null) {
+                    return null;
+                }
+                //noinspection unchecked
+                return mComparator.getChangePayload(mOldItem.data, mNewItem.data);
+            }
+        }, detectMoves);
         mItems.clear();
         mItems.addAll(newItems);
-        diffResult.dispatchUpdatesTo(this);
+        result.dispatchUpdatesTo(this);
         mTransactionItems = null;
+        return this;
     }
 
     static class Meta {
         final int type;
-        Object data;
+        final Object data;
 
         Meta(int type, Object data) {
             this.type = type;
@@ -302,7 +349,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
                     return;
                 }
             }
-            throw new RuntimeException(String.format(Locale.getDefault(), "unable to find a appropriate constructor from outers:%s", type));
+            throw new RuntimeException(String.format(Locale.getDefault(), "unable to find a appropriate constructor by args:%s", type));
         }
 
         Holder newInstance(ViewGroup parent) {
@@ -328,21 +375,33 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
             super(null);
         }
 
-        public Holder(ViewGroup group, View view) { super(view); }
+        public Holder(ViewGroup group, View view) {
+            super(view);
+        }
 
-        public Holder(ViewGroup group, @LayoutRes int layout) { super(LayoutInflater.from(group.getContext()).inflate(layout, group, false)); }
+        public Holder(ViewGroup group, @LayoutRes int layout) {
+            super(LayoutInflater.from(group.getContext()).inflate(layout, group, false));
+        }
 
-        protected void bindData(int position, DataType data, @NonNull List<Object> payloads) { bindData(position, data, payloads.isEmpty() ? null : payloads.get(0)); }
+        protected void bindData(int position, DataType data, @NonNull List<Object> payloads) {
+            bindData(position, data, payloads.isEmpty() ? null : payloads.get(0));
+        }
 
-        protected void bindData(int position, DataType data, @Nullable Object payload) { bindData(position, data); }
+        protected void bindData(int position, DataType data, @Nullable Object payload) {
+            bindData(position, data);
+        }
 
-        protected void bindData(int position, DataType data) { }
+        protected void bindData(int position, DataType data) {
+        }
 
-        protected void onViewAttachedToWindow() { }
+        protected void onViewAttachedToWindow() {
+        }
 
-        protected void onViewDetachedFromWindow() { }
+        protected void onViewDetachedFromWindow() {
+        }
 
-        protected void onViewRecycled() { }
+        protected void onViewRecycled() {
+        }
     }
 
     public static abstract class DifferenceComparator<DataType> {
@@ -354,108 +413,10 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
 
         protected abstract boolean areItemsTheSame(DataType o1, DataType o2);
 
-        protected abstract Object getChangePayload(DataType o1, DataType o2);
-
         protected boolean areContentsTheSame(DataType o1, DataType o2) {
             return getChangePayload(o1, o2) == null;
         }
-    }
 
-    private static class TransactionDiffUtilCallback extends DiffUtil.Callback {
-
-        private final RecyclerAdapter mAdapter;
-
-        private final SparseArray<DifferenceComparator<?>> mComparators;
-        private final List<Meta> mOldItems;
-        private final List<Meta> mNewItems;
-
-        private DifferenceComparator mComparator;
-        private Meta mOldItem, mNewItem;
-
-        public TransactionDiffUtilCallback(RecyclerAdapter adapter, DifferenceComparator... comparators) {
-            mAdapter = adapter;
-            mComparators = new SparseArray<>(comparators.length);
-            for (DifferenceComparator<?> comparator : comparators) {
-                mComparators.put(adapter.type(comparator.holder), comparator);
-            }
-            mOldItems = new ArrayList<>(adapter.mItems);
-            mNewItems = new ArrayList<>(adapter.mTransactionItems);
-        }
-
-        @Override
-        public int getOldListSize() {
-            return mOldItems.size();
-        }
-
-        @Override
-        public int getNewListSize() {
-            return mNewItems.size();
-        }
-
-        @Override
-        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-            mOldItem = mOldItems.get(oldItemPosition);
-            mNewItem = mNewItems.get(newItemPosition);
-            if (mOldItem.type != mNewItem.type) {
-                return false;
-            }
-            mComparator = mComparators.get(mNewItem.type);
-            if (mComparator == null) {
-                return Objects.equals(mOldItem.data, mNewItem.data);
-            }
-            //noinspection unchecked
-            return mComparator.areItemsTheSame(mOldItem.data, mNewItem.data);
-        }
-
-        @Override
-        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-            mOldItem = mOldItems.get(oldItemPosition);
-            mNewItem = mNewItems.get(newItemPosition);
-            mComparator = mComparators.get(mNewItem.type);
-            if (mComparator == null) {
-                return true;
-            }
-            //noinspection unchecked
-            return mComparator.areContentsTheSame(mOldItem.data, mNewItem.data);
-        }
-
-        @Nullable
-        @Override
-        public Object getChangePayload(int oldItemPosition, int newItemPosition) {
-            mOldItem = mOldItems.get(oldItemPosition);
-            mNewItem = mNewItems.get(newItemPosition);
-            mComparator = mComparators.get(mNewItem.type);
-            if (mComparator == null) {
-                return null;
-            }
-            //noinspection unchecked
-            return mComparator.getChangePayload(mOldItem.data, mNewItem.data);
-        }
-
-        public List<Meta> getNewItems() {
-            return mNewItems;
-        }
-    }
-
-    private static class TransactionAsyncTask extends AsyncTask<Object, Object, DiffUtil.DiffResult> {
-        private final RecyclerAdapter mAdapter;
-        private final TransactionDiffUtilCallback mCallback;
-        private final boolean mDetectMoves;
-
-        public TransactionAsyncTask(RecyclerAdapter adapter, TransactionDiffUtilCallback callback, boolean detectMoves) {
-            mAdapter = adapter;
-            mCallback = callback;
-            mDetectMoves = detectMoves;
-        }
-
-        @Override
-        protected DiffUtil.DiffResult doInBackground(Object... objects) {
-            return DiffUtil.calculateDiff(mCallback, mDetectMoves);
-        }
-
-        @Override
-        protected void onPostExecute(DiffUtil.DiffResult diffResult) {
-            mAdapter.dispatchUpdatesTransaction(diffResult, mCallback.getNewItems());
-        }
+        protected abstract Object getChangePayload(DataType o1, DataType o2);
     }
 }
