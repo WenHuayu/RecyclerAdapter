@@ -164,6 +164,32 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     }
 
     /**
+     * {0:0}{1:1}{2:2} -> {1:11} -> {0:0}{1:11}{2:2}
+     */
+    public <DataType> RecyclerAdapter change(DataType data, DifferenceComparator<DataType> comparator) {
+        List<Meta> metas = data();
+        int type = type(comparator.holder);
+        for (int i = 0, size = metas.size(); i < size; i++) {
+            Meta meta = metas.get(i);
+            if (type == metas.get(i).type) {
+                //noinspection unchecked
+                DataType d = (DataType) metas.get(i).data;
+                if (comparator.areItemsTheSame(d, data)) {
+                    if (mTransactionItems != null) {
+                        metas.set(i, new Meta(type, data));
+                    } else if (!comparator.areContentsTheSame(d, data)) {
+                        Object payload = comparator.getChangePayload(d, data);
+                        metas.set(i, new Meta(type, data));
+                        notifyItemChanged(i, payload);
+                    }
+                    return this;
+                }
+            }
+        }
+        return this;
+    }
+
+    /**
      * {0}{1}{2} -> [1] -> {0}{2}
      */
     public RecyclerAdapter remove(int index) {
@@ -197,7 +223,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         if (mTransactionItems == null) notifyItemMoved(from, to);
         return this;
     }
-
 
     public RecyclerAdapter beginTransaction() {
         return beginTransaction(true);
@@ -411,12 +436,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
             this.holder = holder;
         }
 
-        protected abstract boolean areItemsTheSame(DataType o1, DataType o2);
+        protected abstract boolean areItemsTheSame(DataType oldItem, DataType newItem);
 
-        protected boolean areContentsTheSame(DataType o1, DataType o2) {
-            return getChangePayload(o1, o2) == null;
+        protected boolean areContentsTheSame(DataType oldItem, DataType newItem) {
+            return getChangePayload(oldItem, newItem) == null;
         }
 
-        protected abstract Object getChangePayload(DataType o1, DataType o2);
+        protected Object getChangePayload(DataType oldItem, DataType newItem) {return null;}
     }
 }
