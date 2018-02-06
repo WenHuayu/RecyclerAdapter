@@ -1,7 +1,7 @@
-package com.why94.recycler;
+package com.why94.recycler.sample;
 
-import android.app.Activity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
@@ -10,13 +10,15 @@ import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import com.why94.recycler.RecyclerAdapter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
-public class RecyclerAdapterTestMainActivity extends Activity implements CompoundButton.OnCheckedChangeListener {
+public class MainActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener {
 
     View mAdd;
     View mChange;
@@ -38,7 +40,6 @@ public class RecyclerAdapterTestMainActivity extends Activity implements Compoun
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         mAdd = findViewById(R.id.add);
         mChange = findViewById(R.id.change);
         mMove = findViewById(R.id.move);
