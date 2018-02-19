@@ -53,10 +53,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         }
     }
 
-    private List<Meta> data() {
-        return mTransactionData == null ? mAdapterData : mTransactionData;
-    }
-
     public boolean isEmpty() {
         return mAdapterData.isEmpty();
     }
@@ -253,7 +249,11 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} ->  -> Ø
      */
     public RecyclerAdapter clear() {
-        return remove(0, data().size());
+        if (mTransactionData == null) {
+            return remove(0, mAdapterData.size());
+        } else {
+            return remove(0, mTransactionData.size());
+        }
     }
 
     /**
