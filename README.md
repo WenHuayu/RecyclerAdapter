@@ -1,3 +1,6 @@
+
+[![](https://jitpack.io/v/WenHuayu/RecyclerAdapter.svg)](https://jitpack.io/#WenHuayu/RecyclerAdapter)
+
 # RecyclerAdapter
 
 Step 1. Add the JitPack repository to your build file
