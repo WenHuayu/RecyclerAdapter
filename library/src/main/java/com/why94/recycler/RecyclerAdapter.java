@@ -17,7 +17,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 /**
  * RecyclerAdapter
@@ -202,8 +201,10 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2}{3}{4} -> [1,3) -> {0}{3}{4}
      */
     public RecyclerAdapter remove(int from, int to) {
-        data().subList(from, to).clear();
-        if (mTransactionItems == null) notifyItemRangeRemoved(from, to - from);
+        if (from != to) {
+            data().subList(from, to).clear();
+            if (mTransactionItems == null) notifyItemRangeRemoved(from, to - from);
+        }
         return this;
     }
 
@@ -284,7 +285,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
                 }
                 mComparator = comparatorsSparseArray.get(mNewItem.type);
                 if (mComparator == null) {
-                    return Objects.equals(mOldItem.data, mNewItem.data);
+                    return mOldItem.data == mNewItem.data || (mOldItem.data != null && mOldItem.data.equals(mNewItem.data));
                 }
                 //noinspection unchecked
                 return mComparator.areItemsTheSame(mOldItem.data, mNewItem.data);
