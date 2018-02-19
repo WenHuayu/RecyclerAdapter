@@ -1,6 +1,5 @@
 package com.why94.recycler;
 
-import android.os.AsyncTask;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -22,41 +21,54 @@ import java.util.Locale;
  * RecyclerAdapter
  * Created by WenHuayu<why94@qq.com> on 2017/11/27.
  */
-@SuppressWarnings({"SameParameterValue", "UnusedReturnValue", "WeakerAccess", "unused"})
+@SuppressWarnings({"UnusedReturnValue", "WeakerAccess", "SameParameterValue", "unused"})
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder> {
 
-    private final List<Meta> mItems = new ArrayList<>();
-    private final List<Object> mHolderInitArgs = new ArrayList<>();
-    private final SparseArray<ConstructorMeta> mHolderConstructors = new SparseArray<>();
-    private final HashMap<Class, Integer> mHolderTypeMap = new HashMap<>(1);
+    private final ArrayList<Object> mHolderInitArgs;
+    private final SparseArray<ConstructorMeta> mHolderConstructors;
+    private final HashMap<Class, Integer> mHolderTypeMap;
+    private ArrayList<Meta> mAdapterData = new ArrayList<>();
+    private ArrayList<Meta> mTransactionData;
 
-    private List<Meta> mTransactionItems;
-    private AsyncTask mTransactionAsyncTask;
-
-    public RecyclerAdapter(Object... holderInitArgs) {
-        this.mHolderInitArgs.addAll(Arrays.asList(holderInitArgs));
+    public RecyclerAdapter(Object... holderInitialArgs) {
+        this(1, holderInitialArgs);
     }
 
-    public void addHolderInitArgs(Object... initArgs) {
-        this.mHolderInitArgs.addAll(Arrays.asList(initArgs));
+    public RecyclerAdapter(int typeInitialCapacity, Object... holderInitialArgs) {
+        mHolderInitArgs = new ArrayList<>(holderInitialArgs.length);
+        if (holderInitialArgs.length == 1) {
+            mHolderInitArgs.add(holderInitialArgs[0]);
+        } else {
+            mHolderInitArgs.addAll(Arrays.asList(holderInitialArgs));
+        }
+        mHolderConstructors = new SparseArray<>(typeInitialCapacity);
+        mHolderTypeMap = new HashMap<>(typeInitialCapacity);
+    }
+
+    public void addHolderInitArgs(Object... holderInitialArgs) {
+        if (holderInitialArgs.length == 1) {
+            mHolderInitArgs.add(holderInitialArgs[0]);
+        } else {
+            mHolderInitArgs.addAll(Arrays.asList(holderInitialArgs));
+        }
     }
 
     private List<Meta> data() {
-        return mTransactionItems == null ? mItems : mTransactionItems;
+        return mTransactionData == null ? mAdapterData : mTransactionData;
     }
 
     public boolean isEmpty() {
-        return mItems.isEmpty();
+        return mAdapterData.isEmpty();
     }
 
     @Override
     public int getItemCount() {
-        return mItems.size();
+        return mAdapterData.size();
     }
 
     @Override
     public int getItemViewType(int position) {
-        return mItems.get(position).type;
+        return mAdapterData.get(position).type;
     }
 
     @Override
@@ -65,12 +77,13 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     }
 
     @Override
-    public void onBindViewHolder(Holder holder, int position) { }
+    public void onBindViewHolder(Holder holder, int position) {
+    }
 
     @Override
     @SuppressWarnings("unchecked")
     public void onBindViewHolder(Holder holder, int position, List<Object> payloads) {
-        holder.bindData(position, holder.data = mItems.get(position).data, payloads);
+        holder.bindData(position, holder.data = mAdapterData.get(position).data, payloads);
     }
 
     @Override
@@ -86,10 +99,6 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     @Override
     public void onViewRecycled(Holder holder) {
         holder.onViewRecycled();
-    }
-
-    public int getDataCount() {
-        return data().size();
     }
 
     private int type(Class<? extends Holder> clas) {
@@ -108,8 +117,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} -> {3} -> {0}{1}{2}{3}
      */
     public <DataType> RecyclerAdapter add(Class<? extends Holder<DataType>> type, DataType data) {
-        data().add(new Meta(type(type), data));
-        if (mTransactionItems == null) notifyItemInserted(mItems.size() - 1);
+        if (mTransactionData == null) {
+            mAdapterData.add(new Meta(type(type), data));
+            notifyItemInserted(mAdapterData.size() - 1);
+        } else {
+            mTransactionData.add(new Meta(type(type), data));
+        }
         return this;
     }
 
@@ -117,8 +130,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} -> [1]:{3} -> {0}{3}{1}{2}
      */
     public <DataType> RecyclerAdapter add(int index, Class<? extends Holder<DataType>> type, DataType data) {
-        data().add(index, new Meta(type(type), data));
-        if (mTransactionItems == null) notifyItemInserted(index);
+        if (mTransactionData == null) {
+            mAdapterData.add(index, new Meta(type(type), data));
+            notifyItemInserted(index);
+        } else {
+            mTransactionData.add(index, new Meta(type(type), data));
+        }
         return this;
     }
 
@@ -127,8 +144,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public <DataType> RecyclerAdapter add(Class<? extends Holder<DataType>> type, List<DataType> data) {
         if (data != null && !data.isEmpty()) {
-            data().addAll(Meta.list(type(type), data));
-            if (mTransactionItems == null) notifyItemRangeInserted(mItems.size() - data.size(), data.size());
+            if (mTransactionData == null) {
+                mAdapterData.addAll(Meta.list(type(type), data));
+                notifyItemRangeInserted(mAdapterData.size() - data.size(), data.size());
+            } else {
+                mTransactionData.addAll(Meta.list(type(type), data));
+            }
         }
         return this;
     }
@@ -138,8 +159,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public <DataType> RecyclerAdapter add(int index, @NonNull Class<? extends Holder<DataType>> type, List<DataType> data) {
         if (data != null && !data.isEmpty()) {
-            data().addAll(index, Meta.list(type(type), data));
-            if (mTransactionItems == null) notifyItemRangeInserted(index, data.size());
+            if (mTransactionData == null) {
+                mAdapterData.addAll(index, Meta.list(type(type), data));
+                notifyItemRangeInserted(index, data.size());
+            } else {
+                mTransactionData.addAll(index, Meta.list(type(type), data));
+            }
         }
         return this;
     }
@@ -148,8 +173,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} -> [1]:{3} -> {0}{3}{2}
      */
     public <DataType> RecyclerAdapter change(int index, Class<? extends Holder<DataType>> type, DataType data) {
-        data().set(index, new Meta(type(type), data));
-        if (mTransactionItems == null) notifyItemChanged(index);
+        if (mTransactionData == null) {
+            mAdapterData.set(index, new Meta(type(type), data));
+            notifyItemChanged(index);
+        } else {
+            mTransactionData.set(index, new Meta(type(type), data));
+        }
         return this;
     }
 
@@ -157,8 +186,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} -> [1]:{3} -> {0}{3}{2}
      */
     public <DataType> RecyclerAdapter change(int index, Class<? extends Holder<DataType>> type, DataType data, Object payload) {
-        data().set(index, new Meta(type(type), data));
-        if (mTransactionItems == null) notifyItemChanged(index, payload);
+        if (mTransactionData == null) {
+            mAdapterData.set(index, new Meta(type(type), data));
+            notifyItemChanged(index, payload);
+        } else {
+            mTransactionData.set(index, new Meta(type(type), data));
+        }
         return this;
     }
 
@@ -166,7 +199,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0:0}{1:1}{2:2} -> {1:11} -> {0:0}{1:11}{2:2}
      */
     public <DataType> RecyclerAdapter change(DataType data, DifferenceComparator<DataType> comparator) {
-        List<Meta> metas = data();
+        List<Meta> metas = mTransactionData == null ? mAdapterData : mTransactionData;
         int type = type(comparator.holder);
         for (int i = 0, size = metas.size(); i < size; i++) {
             Meta meta = metas.get(i);
@@ -174,7 +207,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
                 //noinspection unchecked
                 DataType d = (DataType) metas.get(i).data;
                 if (comparator.areItemsTheSame(d, data)) {
-                    if (mTransactionItems != null) {
+                    if (mTransactionData != null) {
                         metas.set(i, new Meta(type, data));
                     } else if (!comparator.areContentsTheSame(d, data)) {
                         Object payload = comparator.getChangePayload(d, data);
@@ -192,8 +225,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} -> [1] -> {0}{2}
      */
     public RecyclerAdapter remove(int index) {
-        data().remove(index);
-        if (mTransactionItems == null) notifyItemRemoved(index);
+        if (mTransactionData == null) {
+            mAdapterData.remove(index);
+            notifyItemRemoved(index);
+        } else {
+            mTransactionData.remove(index);
+        }
         return this;
     }
 
@@ -202,8 +239,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      */
     public RecyclerAdapter remove(int from, int to) {
         if (from != to) {
-            data().subList(from, to).clear();
-            if (mTransactionItems == null) notifyItemRangeRemoved(from, to - from);
+            if (mTransactionData == null) {
+                mAdapterData.subList(from, to).clear();
+                notifyItemRangeRemoved(from, to - from);
+            } else {
+                mTransactionData.subList(from, to).clear();
+            }
         }
         return this;
     }
@@ -219,9 +260,12 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
      * {0}{1}{2} -> [2][0] -> {2}{0}{1}
      */
     public RecyclerAdapter move(int from, int to) {
-        List<Meta> data = data();
-        data.add(to, data.remove(from));
-        if (mTransactionItems == null) notifyItemMoved(from, to);
+        if (mTransactionData == null) {
+            mAdapterData.add(to, mAdapterData.remove(from));
+            notifyItemMoved(from, to);
+        } else {
+            mTransactionData.add(to, mTransactionData.remove(from));
+        }
         return this;
     }
 
@@ -230,20 +274,14 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     }
 
     public RecyclerAdapter beginTransaction(boolean cancelLast) {
-        if (cancelLast) {
-            cancelTransaction();
-        }
-        if (mTransactionItems == null) {
-            mTransactionItems = new ArrayList<>(mItems);
+        if (cancelLast || mTransactionData == null) {
+            mTransactionData = new ArrayList<>(mAdapterData);
         }
         return this;
     }
 
     public RecyclerAdapter cancelTransaction() {
-        if (mTransactionAsyncTask != null) {
-            mTransactionAsyncTask.cancel(true);
-        }
-        mTransactionItems = null;
+        mTransactionData = null;
         return this;
     }
 
@@ -252,17 +290,18 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
     }
 
     public RecyclerAdapter commitTransaction(boolean detectMoves, DifferenceComparator... comparators) {
-        if (mTransactionItems == null) {
+        if (mTransactionData == null) {
             return this;
         }
         final SparseArray<DifferenceComparator<?>> comparatorsSparseArray = new SparseArray<>(comparators.length);
         for (DifferenceComparator<?> comparator : comparators) {
             comparatorsSparseArray.put(type(comparator.holder), comparator);
         }
-        final List<Meta> newItems = mTransactionItems;
-        final List<Meta> oldItems = new ArrayList<>(mItems);
-        DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
-
+        final List<Meta> oldItems = mAdapterData;
+        final List<Meta> newItems = mTransactionData;
+        mAdapterData = mTransactionData;
+        mTransactionData = null;
+        DiffUtil.calculateDiff(new DiffUtil.Callback() {
             private DifferenceComparator mComparator;
             private Meta mOldItem, mNewItem;
 
@@ -315,15 +354,11 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
                 //noinspection unchecked
                 return mComparator.getChangePayload(mOldItem.data, mNewItem.data);
             }
-        }, detectMoves);
-        mItems.clear();
-        mItems.addAll(newItems);
-        result.dispatchUpdatesTo(this);
-        mTransactionItems = null;
+        }, detectMoves).dispatchUpdatesTo(this);
         return this;
     }
 
-    static class Meta {
+    private static class Meta {
         final int type;
         final Object data;
 
@@ -341,11 +376,11 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
         }
     }
 
-    static class ConstructorMeta {
+    private static class ConstructorMeta {
         final Constructor<? extends Holder> constructor;
         final Object[] args;
 
-        ConstructorMeta(List<Object> outers, Class<? extends Holder> type) {
+        ConstructorMeta(List<Object> args, Class<? extends Holder> type) {
             for (Constructor<?> constructor : type.getConstructors()) {
                 Class<?>[] parameters = constructor.getParameterTypes();
                 if (parameters.length == 0) {
@@ -354,24 +389,24 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
                 if (parameters[parameters.length - 1] != ViewGroup.class) {
                     continue;
                 }
-                Object[] args = new Object[parameters.length];
+                Object[] temp = new Object[parameters.length];
                 for (int i = 0, length = parameters.length - 1; i < length; i++) {
-                    for (Object outer : outers) {
-                        if (parameters[i].isAssignableFrom(outer.getClass())) {
-                            args[i] = outer;
+                    for (Object arg : args) {
+                        if (parameters[i].isAssignableFrom(arg.getClass())) {
+                            temp[i] = arg;
                             break;
                         }
                     }
-                    if (args[i] == null) {
-                        args = null;
+                    if (temp[i] == null) {
+                        temp = null;
                         break;
                     }
                 }
-                if (args != null) {
+                if (temp != null) {
                     //noinspection unchecked
                     this.constructor = (Constructor<? extends Holder>) constructor;
                     this.constructor.setAccessible(true);
-                    this.args = args;
+                    this.args = temp;
                     return;
                 }
             }
@@ -396,8 +431,8 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
          * but the super constructor should call others, such as{@link #Holder(ViewGroup, int)} or {@link #Holder(ViewGroup, View)}
          */
         @Deprecated
+        @SuppressWarnings("ConstantConditions")
         public Holder(ViewGroup group) {
-            //noinspection ConstantConditions
             super(null);
         }
 
@@ -443,6 +478,8 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder
             return getChangePayload(oldItem, newItem) == null;
         }
 
-        protected Object getChangePayload(DataType oldItem, DataType newItem) {return null;}
+        protected Object getChangePayload(DataType oldItem, DataType newItem) {
+            return null;
+        }
     }
 }
