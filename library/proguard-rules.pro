@@ -20,6 +20,6 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--keepclassmembers public class * extends com.why94.recycler.RecyclerAdapter$Holder {
+-keepclassmembers class * extends com.why94.recycler.RecyclerAdapter$Holder {
     public <init>(...);
 }
