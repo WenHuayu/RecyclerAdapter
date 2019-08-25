@@ -143,7 +143,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     class DataHolder extends RecyclerAdapter.Holder<Integer> {
         TextView tv;
 
-        public DataHolder(ViewGroup group,Integer i) {
+        public DataHolder(ViewGroup group) {
             super(group, R.layout.item);
             tv = (TextView) itemView;
         }

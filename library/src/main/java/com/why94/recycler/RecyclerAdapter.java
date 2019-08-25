@@ -4,6 +4,7 @@ import android.support.annotation.LayoutRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.util.DiffUtil;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
@@ -25,6 +26,17 @@ import java.util.Map;
  */
 @SuppressWarnings({"UnusedReturnValue", "WeakerAccess", "unused"})
 public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.Holder> {
+
+    public static RecyclerAdapter attach(RecyclerView view, Object... initialHolderInstantiationArg) {
+        return attach(view, new LinearLayoutManager(view.getContext()), initialHolderInstantiationArg);
+    }
+
+    public static RecyclerAdapter attach(RecyclerView view, RecyclerView.LayoutManager layoutManager, Object... initialHolderInstantiationArg) {
+        RecyclerAdapter adapter = new RecyclerAdapter(initialHolderInstantiationArg);
+        view.setLayoutManager(layoutManager);
+        view.setAdapter(adapter);
+        return adapter;
+    }
 
     /**
      * 实例化Holder备用的参数列表
